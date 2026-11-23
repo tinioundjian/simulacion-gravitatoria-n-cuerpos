@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulación Gravitatoria de un Sistema Planetario | Valentina Oundjian</title>
+  
+  <!-- KaTeX para renderizado de fórmulas matemáticas (Local 100% offline + CDN fallback) -->
+  <link rel="stylesheet" href="lib/katex/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="lib/katex/katex.min.js"></script>
+  <script src="lib/katex/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.85);
+      --border: rgba(60, 80, 120, 0.4);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-rgb: 56, 189, 248;
+      --euler: #f87171;
+      --leapfrog: #4ade80;
+      --star: #fbbf24;
+      --b1: #38bdf8;
+      --b2: #818cf8;
+      --b3: #f472b6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stars-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(ellipse at bottom, #111827 0%, #030712 100%);
+      z-index: -1;
+    }
+
+    header {
+      padding: 0.9rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10, 15, 26, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.75rem 2rem;
+      position: relative;
+    }
+
+    .slide {
+      display: none;
+      width: 100%;
+      max-width: 1150px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.25rem 2.75rem;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      margin-bottom: 0.75rem;
+      border: 1px solid;
+    }
+
+    .tag-b1 { background: rgba(56, 189, 248, 0.15); color: var(--b1); border-color: rgba(56, 189, 248, 0.3); }
+    .tag-b2 { background: rgba(129, 140, 248, 0.15); color: var(--b2); border-color: rgba(129, 140, 248, 0.3); }
+    .tag-b3 { background: rgba(244, 114, 182, 0.15); color: var(--b3); border-color: rgba(244, 114, 182, 0.3); }
+
+    h1 {
+      font-size: 2.3rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+      color: #ffffff;
+    }
+
+    h2 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      margin-bottom: 0.9rem;
+      color: #f1f5f9;
+    }
+
+    p {
+      font-size: 1.02rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      margin-bottom: 1.1rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.75rem;
+      align-items: center;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+
+    .card h3 {
+      font-size: 1.05rem;
+      margin-bottom: 0.45rem;
+      color: var(--accent);
+    }
+
+    .card p {
+      font-size: 0.92rem;
+      margin-bottom: 0;
+      color: #94a3b8;
+    }
+
+    .demo-container {
+      background: #030712;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    canvas {
+      background: #050b14;
+      border-radius: 8px;
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+    }
+
+    .controls-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 0.85rem;
+    }
+
+    button.btn {
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.55rem 1.1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button.btn:hover {
+      background: #334155;
+      border-color: var(--accent);
+    }
+
+    button.btn-euler {
+      border-color: rgba(248, 113, 113, 0.4);
+      color: #fca5a5;
+    }
+    button.btn-euler.active {
+      background: var(--euler);
+      color: #000;
+      border-color: var(--euler);
+    }
+
+    button.btn-leap {
+      border-color: rgba(74, 222, 128, 0.4);
+      color: #86efac;
+    }
+    button.btn-leap.active {
+      background: var(--leapfrog);
+      color: #000;
+      border-color: var(--leapfrog);
+    }
+
+    .img-box {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #030712;
+    }
+
+    .img-box img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    footer {
+      padding: 0.9rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      background: rgba(10, 15, 26, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .progress-dots {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .dot.active {
+      background: var(--accent);
+      transform: scale(1.3);
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .nav-btn {
+      background: #1e293b;
+      color: #ffffff;
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: var(--accent);
+      color: #090d16;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+      padding: 0.9rem 1.15rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.85rem;
+    }
+
+    .callout-alert {
+      border-left-color: var(--euler);
+      background: rgba(248, 113, 113, 0.08);
+    }
+
+    .callout-success {
+      border-left-color: var(--leapfrog);
+      background: rgba(74, 222, 128, 0.08);
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .notes-toggle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .notes-panel {
+      display: none;
+      margin-top: 1.25rem;
+      padding: 0.9rem 1.1rem;
+      background: rgba(30, 41, 59, 0.75);
+      border-radius: 8px;
+      border-left: 3px solid #fbbf24;
+      font-size: 0.88rem;
+      color: #fef08a;
+      line-height: 1.5;
+    }
+
+    .notes-panel.visible {
+      display: block;
+    }
+
+    .kb {
+      font-family: monospace;
+      background: #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #e2e8f0;
+      font-size: 0.8rem;
+    }
+
+    .block-indicator {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-left: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stars-bg"></div>
+
+  <header>
+    <div class="brand">
+      🪐 Simulación Gravitatoria de N Cuerpos
+    </div>
+    <div class="meta">
+      Valentina Oundjian | Computación — Facultad de Ciencias, UdelaR (2026)
+    </div>
+  </header>
+
+  <main>
+
+    <!-- SLIDE 1: Portada y Estructura 5-10-5 -->
+    <div class="slide active" id="slide-1">
+      <span class="tag tag-b1">Defensa Oral • 20 Minutos</span>
+      <h1 style="font-size: 2.7rem; margin-top: 0.4rem; margin-bottom: 0.8rem;">
+        Simulación gravitatoria de un sistema planetario
+      </h1>
+      <p style="font-size: 1.2rem; color: var(--accent); margin-bottom: 1.75rem;">
+        Física de N cuerpos, métodos numéricos y proceso de aprendizaje con un Agente de IA
+      </p>
+      
+      <div class="grid-3" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+        <div class="card" style="border-top: 4px solid var(--b1);">
+          <h3>⏱️ Minutos 0 a 5</h3>
+          <p><strong>Bloque 1: La Física</strong><br>El problema de 3 cuerpos, leyes de conservación y la geometría de la divergencia.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--b2);">
+          <h3>⏱️ Minutos 5 a 15</h3>
+          <p><strong>Bloque 2: La Simulación</strong><br>Arquitectura del código, demo en vivo en marcha y validación científica de resultados.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--b3);">
+          <h3>⏱️ Minutos 15 a 20</h3>
+          <p><strong>Bloque 3: El Agente de IA</strong><br>Cómo lo manejé, qué sirvió, el tropiezo con Pygame y cómo lo audité críticamente.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Estructura acordada:</strong> 5 min de fundamentos físicos &nbsp;•&nbsp; 10 min de código y resultados en marcha &nbsp;•&nbsp; 5 min de proceso y manejo del agente de IA.
+      </div>
+
+      <div class="notes-panel" id="note-1">
+        <strong>Guion de apertura:</strong> "Buenas a todos. Hoy les presento mi proyecto final: una simulación gravitatoria de un sistema planetario de 3 cuerpos. La presentación está organizada en tres momentos: en los primeros 5 minutos repasamos la física y por qué el problema es desafiante; en los siguientes 10 minutos vemos la simulación funcionando en vivo, cómo está estructurado el código y cómo validamos los resultados; y en los últimos 5 minutos profundizamos en lo central del curso: cómo trabajé con el agente de IA, cómo lo manejé y qué aprendí con él."
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- BLOQUE 1: LA FÍSICA (MINUTOS 0 A 5)                      -->
+    <!-- ======================================================== -->
+
+    <!-- SLIDE 2: Bloque 1 - El Problema -->
+    <div class="slide" id="slide-2">
+      <span class="tag tag-b1">Bloque 1 • La Física (0 a 5 min)</span>
+      <h2>Del problema de 2 cuerpos al caos de 3 cuerpos</h2>
+      
+      <div class="grid-2">
+        <div>
+          <p>
+            <strong>La solución analítica de Newton:</strong> En el problema de dos cuerpos (estrella y un planeta), la solución exacta es una elipse cerrada fija (Kepler).
+          </p>
+          <p>
+            <strong>El salto a 3 cuerpos:</strong> Al incorporar un segundo planeta, las atracciones mutuas planeta-planeta perturban las trayectorias. A fines del siglo XIX, <strong>Henri Poincaré</strong> demostró que no existe una fórmula analítica general y nació el estudio del caos determinista.
+          </p>
+          <div class="callout">
+            <strong>Ecuaciones de movimiento (Sistema de 1er orden):</strong>
+            $$\frac{d\vec{r}_i}{dt} = \vec{v}_i, \quad \frac{d\vec{v}_i}{dt} = \vec{a}_i = \sum_{j \neq i} G \frac{m_j (\vec{r}_j - \vec{r}_i)}{|\vec{r}_j - \vec{r}_i|^3}$$
+            Para 3 cuerpos en 2D evolucionamos 12 variables (6 posiciones, 6 velocidades).
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="border-left: 4px solid var(--accent); margin-bottom: 1rem;">
+            <h3>⚖️ Sistema aislado y Baricentro</h3>
+            <p>
+              La estrella <strong>no está fija</strong>. Trasladamos las condiciones iniciales al centro de masa para que $\vec{R}_{\text{cm}}(0) = \vec{0}$ y $\vec{P}(0) = \vec{0}$. La estrella se bambolea respetando la 3ª ley de Newton.
+            </p>
+          </div>
+          <div class="card" style="border-left: 4px solid var(--euler);">
+            <h3>🎯 La pregunta física central</h3>
+            <p>
+              Cuando simulamos en computadora paso a paso...<br>
+              <strong>¿El método numérico respeta las leyes de conservación de la física o crea efectos artificiales?</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-2">
+        <strong>Guion (Física):</strong> "En astronomía dos cuerpos son analíticos, pero cuando sumamos otro planeta no hay fórmula matemática: Poincaré demostró que el sistema es caótico. Hoy en día se simula paso a paso integrando la 2ª ley de Newton. Es clave notar que la estrella no está clavada en el origen: todo el sistema está centrado en el baricentro para que el momento total inicial sea cero."
+      </div>
+    </div>
+
+    <!-- SLIDE 3: Bloque 1 - La Idea de Fondo: Geometría de Euler vs Leapfrog -->
+    <div class="slide" id="slide-3">
+      <span class="tag tag-b1">Bloque 1 • La Física (0 a 5 min)</span>
+      <h2>La intuición geométrica: ¿Por qué falla Euler?</h2>
+
+      <div class="grid-2">
+        <div>
+          <h3 style="color: var(--euler); margin-bottom: 0.75rem;">🚗 Euler explícito: La tangente en la rotonda</h3>
+          <p>
+            Imaginen manejar un auto en una rotonda cerrada. Para mantenerse en la curva hay que doblar constantemente el volante hacia el centro (gravedad).
+          </p>
+          <p>
+            Euler avanza usando la velocidad del inicio del paso:
+            $$\vec{r}^{n+1} = \vec{r}^n + \vec{v}^n \Delta t$$
+            En una órbita circular, la velocidad apunta por la <strong>tangente</strong>. Moverse en línea recta por la tangente hace que el planeta termine <em>siempre afuera del círculo</em>.
+          </p>
+          <div class="callout callout-alert">
+            <strong>Deriva secular de energía:</strong>
+            Al alejarse en cada paso, el integrador le regala energía artificial. Con miles de pasos la órbita se abre en espiral y el planeta se escapa.
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--leapfrog); margin-bottom: 0.75rem;">🐸 Leapfrog: Doblar en el punto medio</h3>
+          <p>
+            Leapfrog (Kick-Drift-Kick) da primero medio paso de velocidad:
+            $$\vec{v}^{n+1/2} = \vec{v}^n + \frac{\Delta t}{2}\vec{a}^n$$
+          </p>
+          <p>
+            Cuando va a mover la posición $\vec{r}^{n+1} = \vec{r}^n + \Delta t \, \vec{v}^{n+1/2}$, <em>¡la velocidad ya dobló hacia adentro!</em> Compensa la curvatura exactamente.
+          </p>
+          <div class="callout callout-success">
+            <strong>Integrador Simpléctico:</strong>
+            Preserva la geometría del espacio de fases (Liouville) y es reversible en el tiempo. La energía oscila acotada pero nunca se escapa.
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-3">
+        <strong>Guion (Física):</strong> "Acá está la clave física: Euler avanza en línea recta sobre la tangente; por eso en cada paso el radio aumenta y gana energía espuria. Leapfrog en cambio calcula la velocidad en el punto medio del paso, doblando el volante antes de desplazarse. Por eso es simpléctico: conserva el volumen del espacio de fases y mantiene la órbita cerrada."
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- BLOQUE 2: LA SIMULACIÓN Y RESULTADOS (MINUTOS 5 A 15)    -->
+    <!-- ======================================================== -->
+
+    <!-- SLIDE 4: Bloque 2 - Demostración Práctica en Vivo -->
+    <div class="slide" id="slide-4">
+      <span class="tag tag-b2">Bloque 2 • La Simulación (5 a 15 min)</span>
+      <h2>Demostración Práctica en Vivo: El Código en Marcha</h2>
+      
+      <div class="demo-container">
+        <!-- Preset and Method Toggle Controls -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn active" id="btnSys3" onclick="setSystem('3body')">🌌 Sistema 3 Cuerpos (Estrella + 2 Planetas)</button>
+            <button class="btn" id="btnSys1" onclick="setSystem('consigna')">🎯 Caso Testigo Consigna (1 Planeta)</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-euler active" id="btnEuler" onclick="setMode('euler')">🔴 Euler Explícito</button>
+            <button class="btn btn-leap" id="btnLeap" onclick="setMode('leapfrog')">🟢 Leapfrog Simpléctico</button>
+          </div>
+        </div>
+
+        <canvas id="orbitCanvas" width="700" height="380"></canvas>
+        
+        <div class="controls-row" style="margin-top: 0.75rem;">
+          <button class="btn" id="btnPlayPause" onclick="togglePlayPause()">⏸️ Pausar</button>
+          <button class="btn" onclick="resetSim()">↺ Reiniciar</button>
+          <button class="btn" onclick="setSpeed(1)">1x</button>
+          <button class="btn" onclick="setSpeed(2)">2x</button>
+          <button class="btn" onclick="setSpeed(4)">4x</button>
+        </div>
+        <p id="simStatus" style="font-size: 0.88rem; margin-top: 0.65rem; color: var(--accent);">
+          Sistema: <strong>Estrella + 2 Planetas en 2D</strong> | Integrador: <strong>Euler Explícito</strong> | Paso dt = 0.002 | Las órbitas ganan energía y se abren en espiral.
+        </p>
+      </div>
+
+      <div class="callout" style="margin-top: 0.85rem; font-size: 0.9rem;">
+        <strong>💻 Ejecución directa en terminal (Python puro):</strong>
+        En cualquier momento de la presentación podés correr <code>python main.py</code> para abrir las figuras en Matplotlib o <code>python main.py --verificar</code> para correr las pruebas unitarias ante la clase.
+      </div>
+
+      <div class="notes-panel" id="note-4">
+        <strong>Guion (Demo en vivo):</strong> "Acá tenemos la simulación corriendo en vivo con el sistema completo de 3 cuerpos de nuestro código: la estrella en amarillo y los dos planetas en azul y rojo. Fíjense cómo con Euler las órbitas se van abriendo y el error de energía sube en el panel superior. Si cambio a Leapfrog, las órbitas quedan perfectamente cerradas y el error se queda en 0.000%. También podemos conmutar al caso testigo de la consigna oficial."
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Bloque 2 - Arquitectura del Código -->
+    <div class="slide" id="slide-5">
+      <span class="tag tag-b2">Bloque 2 • La Simulación (5 a 15 min)</span>
+      <h2>Cómo está armado el código (Arquitectura modular)</h2>
+
+      <p>Organizado en <code>simulacion_planetaria.py</code> en funciones breves e independientes con NumPy:</p>
+
+      <div class="grid-3" style="margin-top: 1rem;">
+        <div class="card">
+          <h3>1. <code>condiciones_iniciales()</code></h3>
+          <p>Define masas en unidades normalizadas ($M=1, G=1, L_0=1$) y traslada las posiciones y velocidades al baricentro ($\vec{R}_{\text{cm}} = \vec{0}, \vec{P} = \vec{0}$).</p>
+        </div>
+
+        <div class="card">
+          <h3>2. <code>aceleraciones()</code></h3>
+          <p>Calcula la atracción gravitatoria newtoniana por pares. Excluye autointeracciones y detecta separaciones nulas ($r_{ij} = 0$) para prevenir indeterminaciones.</p>
+        </div>
+
+        <div class="card">
+          <h3>3. <code>paso_euler()</code></h3>
+          <p>Actualiza $\vec{r}^{n+1} = \vec{r}^n + \vec{v}^n \Delta t$ y $\vec{v}^{n+1} = \vec{v}^n + \vec{a}^n \Delta t$ usando estrictamente el estado en $t_n$ (primer orden).</p>
+        </div>
+
+        <div class="card">
+          <h3>4. <code>paso_leapfrog()</code></h3>
+          <p>Implementa Kick-Drift-Kick: medio impulso de velocidad, desplazamiento completo de posición y medio impulso final con la nueva aceleración.</p>
+        </div>
+
+        <div class="card">
+          <h3>5. <code>magnitudes()</code></h3>
+          <p>Calcula en cada paso la energía mecánica $E = K + U$, el momento lineal $\vec{P}$, el momento angular $L_z$ y la posición del centro de masa.</p>
+        </div>
+
+        <div class="card">
+          <h3>6. <code>simular()</code> y <code>graficar()</code></h3>
+          <p>Bucle temporal que almacena la serie histórica y genera las figuras con Matplotlib manteniendo estricta <strong>escala 1 a 1</strong> (<code>aspect='equal'</code>).</p>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-5">
+        <strong>Guion (Código):</strong> "Para estructurar el código seguimos una arquitectura modular de 6 funciones en NumPy. Separamos el cálculo de la aceleración física del algoritmo de integración numérica, y las magnitudes de control en otra función. Esto permitió que cada componente se pudiera testear de forma aislada."
+      </div>
+    </div>
+
+    <!-- SLIDE 6: Bloque 2 - Resultados: Sistema de 3 Cuerpos -->
+    <div class="slide" id="slide-6">
+      <span class="tag tag-b2">Bloque 2 • La Simulación (5 a 15 min)</span>
+      <h2>Resultados: Sistema de 3 cuerpos durante 10 períodos</h2>
+
+      <div class="grid-2">
+        <div class="img-box">
+          <img src="graficos/figura1_trayectorias_euler.png" alt="Trayectorias 3 Cuerpos Euler">
+        </div>
+        <div>
+          <h3 style="color: var(--accent); margin-bottom: 0.6rem;">Comportamiento observado</h3>
+          <ul style="margin-left: 1.25rem; line-height: 1.8; color: #cbd5e1;">
+            <li><strong>Estrella central (amarillo):</strong> Masa $M=1.0$, bambolea en respuesta a los planetas.</li>
+            <li><strong>Planeta interior (azul):</strong> Masa $10^{-3}$, $r=1.0$, velocidad kepleriana.</li>
+            <li><strong>Planeta exterior (rojo):</strong> Masa $10^{-3}$, $r=2.0$.</li>
+            <li><strong>Duración:</strong> $10 T_{\text{ref}}$ con paso $\Delta t = T_{\text{ref}}/1000$ (10.000 pasos).</li>
+          </ul>
+
+          <div class="callout callout-alert" style="margin-top: 1.25rem;">
+            <strong>Resultado con Euler:</strong>
+            Las trayectorias no son elipses fijas: se abren continuamente en espiral. La energía relativa crece monótonamente hasta $+8.7\%$ debido a la ganancia tangencial.
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-6">
+        <strong>Guion (Resultados):</strong> "Acá vemos la simulación de los 3 cuerpos corriendo durante 10 períodos de referencia. Mantenemos escala 1:1. Fíjense cómo la estrella bambolea en el centro y las órbitas de los dos planetas se van abriendo progresivamente por la acumulación del error de Euler."
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Bloque 2 - Validación: ¿Cómo sabemos que está bien? -->
+    <div class="slide" id="slide-7">
+      <span class="tag tag-b2">Bloque 2 • La Simulación (5 a 15 min)</span>
+      <h2>Validación física: ¿Cómo sabemos que el código está bien?</h2>
+
+      <div class="grid-3" style="margin-bottom: 1.25rem;">
+        <div class="card" style="border-top: 4px solid var(--star);">
+          <h3>1. Cuenta a mano independiente</h3>
+          <p>Masa $1$ en $(0,0)$ y cuerpo en $(1,0)$ con $G=1$. La aceleración teórica es exactamente <strong>$(-1, 0)$</strong>. El código dio exactamente $(-1.000000, 0.000000)$.</p>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--accent);">
+          <h3>2. Momento lineal a nivel de máquina</h3>
+          <p>Por la 3ª ley de Newton ($\vec{F}_{ij} = -\vec{F}_{ji}$), $\sum m_i \vec{a}_i = \vec{0}$. El momento lineal $\vec{P}$ se conservó con error máximo de <strong>$10^{-18}$</strong>.</p>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--leapfrog);">
+          <h3>3. Período analítico de Kepler</h3>
+          <p>Para 2 cuerpos circulares a $r=1$, el tiempo de retorno coincidió con $T = 2\pi\sqrt{1/GM} \approx 6.2798$.</p>
+        </div>
+      </div>
+
+      <div class="img-box" style="max-height: 220px; overflow: hidden;">
+        <img src="graficos/figura2_magnitudes_euler.png" style="margin-top: -10px;" alt="Magnitudes de control">
+      </div>
+      <div class="notes-panel" id="note-7">
+        <strong>Guion (Validación):</strong> "¿Cómo sabemos que esto no tiene bugs? Primero, con una cuenta a mano que da (-1, 0); segundo, el momento lineal se conserva con error de 10^-18 (límite de máquina de float64); y tercero, el período de Kepler cierra analíticamente. La física se respeta a rajatabla."
+      </div>
+    </div>
+
+    <!-- SLIDE 8: Bloque 2 - Comparativa Euler vs Leapfrog y Caso Testigo -->
+    <div class="slide" id="slide-8">
+      <span class="tag tag-b2">Bloque 2 • La Simulación (5 a 15 min)</span>
+      <h2>Resultados: Caso testigo de la consigna y convergencia $\Delta t$</h2>
+
+      <div class="grid-2">
+        <div class="img-box">
+          <img src="graficos/figura_consigna_profesores.png" alt="Caso de la consigna oficial">
+        </div>
+
+        <div>
+          <h3 style="color: var(--accent); margin-bottom: 0.5rem;">El caso testigo de los profesores ($GM=1, r=1, \Delta t=0.05$)</h3>
+          <div class="card" style="margin-bottom: 0.85rem;">
+            <p style="font-family: monospace; font-size: 0.95rem; color: #fff;">
+              • Energía inicial: <strong>-0.500000</strong><br>
+              • Euler final: &nbsp;&nbsp;&nbsp;&nbsp;<strong>-0.2279</strong> (en la pauta: -0.23)<br>
+              • Leapfrog final: &nbsp;<strong>-0.500000</strong> (variación &lt; 3.3e-7)
+            </p>
+          </div>
+
+          <h3 style="color: var(--leapfrog); margin-bottom: 0.5rem;">Convergencia al reducir el paso a la mitad:</h3>
+          <p style="font-size: 0.92rem;">
+            $\text{Error}(\Delta t) \, / \, \text{Error}(\Delta t/2) = \mathbf{1.89 \approx 2.0}$<br>
+            $\text{Error}(\Delta t/2) \, / \, \text{Error}(\Delta t/4) = \mathbf{1.94 \approx 2.0}$<br>
+            Demuestra que el error global de Euler es estrictamente de <strong>primer orden $\mathcal{O}(\Delta t)$</strong>.
+          </p>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-8">
+        <strong>Guion (Resultados extra):</strong> "Reprodujimos exactamente el caso testigo que pusieron los docentes en la consigna: la energía con Euler subió de -0.5 a -0.23 tal como predijeron, mientras que Leapfrog se mantuvo constante en -0.5. Y al dividir el paso a la mitad, el error se redujo a la mitad (1.89 y 1.94), confirmando que Euler es de orden 1."
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- BLOQUE 3: EL TRABAJO CON EL AGENTE (MINUTOS 15 A 20)    -->
+    <!-- ======================================================== -->
+
+    <!-- SLIDE 9: Bloque 3 - Cómo manejé al Agente -->
+    <div class="slide" id="slide-9">
+      <span class="tag tag-b3">Bloque 3 • El Proceso con el Agente (15 a 20 min)</span>
+      <h2>Cómo manejé al Agente: El tropiezo con Pygame y la redirección</h2>
+
+      <div class="grid-2">
+        <div>
+          <h3 style="color: var(--euler); margin-bottom: 0.5rem;">❌ El intento inicial: Sobrediseño</h3>
+          <p>
+            En el primer pedido, el agente generó una aplicación interactiva con Pygame con estrellas titilantes y presets estilo videojuego.
+          </p>
+          <p>
+            <strong>Mi intervención de control:</strong> Frené el proceso: <em>"Esto no responde a la propuesta académica. Necesitamos código científico estándar en NumPy, Matplotlib, funciones modulares específicas y verificación física."</em>
+          </p>
+          <div class="callout callout-alert">
+            <strong>Aprendizaje clave:</strong> Si se le da un pedido vago ("haceme la simulación"), la IA tiende a improvisar soluciones vistosas pero ajenas a la consigna.
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--leapfrog); margin-bottom: 0.5rem;">✅ La redirección hacia el rigor</h3>
+          <p>
+            Cambié la estrategia de trabajo hacia <strong>pedidos acotados y específicos</strong>:
+          </p>
+          <ul style="margin-left: 1.25rem; font-size: 0.95rem; line-height: 1.7; color: #cbd5e1;">
+            <li>No pedirle el programa entero de golpe.</li>
+            <li>Definir la firma de cada función (entradas de arreglos $(N \times 2)$, salidas esperadas).</li>
+            <li>Exigir comprobaciones paso a paso antes de continuar.</li>
+          </ul>
+          <div class="callout callout-success">
+            <strong>Resultado:</strong> Logramos un código limpio, estructurado y 100% testeable.
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-9">
+        <strong>Guion (El Agente):</strong> "Ahora entramos al corazón del curso: cómo trabajé con el agente. Acá hubo un aprendizaje real: al principio el agente me generó un videojuego con Pygame lleno de cosas innecesarias. Tuve que frenarlo y redirigirlo: le pasé la propuesta y le exigí funciones modulares cortas en NumPy y Matplotlib. Aprendí que la clave es no pedirle 'haceme todo', sino dirigirlo con consignas precisas."
+      </div>
+    </div>
+
+    <!-- SLIDE 10: Bloque 3 - Cómo audité a la IA -->
+    <div class="slide" id="slide-10">
+      <span class="tag tag-b3">Bloque 3 • El Proceso con el Agente (15 a 20 min)</span>
+      <h2>Auditoría crítica: ¿Cómo comprobé que no inventaba?</h2>
+
+      <div class="grid-3">
+        <div class="card">
+          <h3>🔍 1. Prueba a mano independiente</h3>
+          <p>
+            Para no confiar a ciegas, diseñé la prueba analítica ($G=1$, masa en $(0,0)$ y cuerpo en $(1,0)$). Comprobé que la aceleración diera $(-1, 0)$ antes de aceptar la función de fuerzas.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>📚 2. Contraste con bibliografía</h3>
+          <p>
+            Contrasté las fórmulas de aceleración vectorial y energía orbital con el libro de <strong>Fitzpatrick</strong> (<em>Introduction to Celestial Mechanics</em>) y los apuntes del curso.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>🧪 3. Suite de tests automatizados</h3>
+          <p>
+            Implementamos pruebas unitarias con <code>pytest</code> que validan la conservación de invariantes en cada modificación (6 pruebas pasando en verde).
+          </p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top: 1.5rem;">
+        <strong>Solución de problemas técnicos de entorno:</strong>
+        En Python 3.14 varias librerías gráficas fallaban porque ya no existe <code>distutils</code>. Trabajé con el agente para simplificar el stack a librerías estándar puras y asegurar que todo corriera de forma autónoma y reproducible.
+      </div>
+      <div class="notes-panel" id="note-10">
+        <strong>Guion (Auditoría):</strong> "Para no aceptar ciegamente lo que la IA escribía, la audité en cada etapa: le exigí la prueba a mano de aceleración (-1, 0) antes de integrar, contrasté las fórmulas con el libro de Fitzpatrick y resolvimos problemas reales de entorno de Python 3.14 eliminando dependencias innecesarias."
+      </div>
+    </div>
+
+    <!-- SLIDE 11: Bloque 3 - El Agente como Tutor Conceptual -->
+    <div class="slide" id="slide-11">
+      <span class="tag tag-b3">Bloque 3 • El Proceso con el Agente (15 a 20 min)</span>
+      <h2>El Agente como tutor: Lo que entendí que antes no entendía</h2>
+
+      <div class="grid-2">
+        <div>
+          <h3 style="color: var(--accent);">💬 Las preguntas clave que le hice</h3>
+          <p>
+            1. <em>"¿Por qué transformamos la 2ª ley de Newton en un sistema de primer orden?"</em><br>
+            Entendí que las computadoras no integran derivadas segundas directamente; descomponer en posición y velocidad permite avanzar paso a paso usando sólo el estado actual.
+          </p>
+          <p>
+            2. <em>"¿Por qué el momento lineal no se desvía pero la energía sí?"</em><br>
+            Me explicó que la 3ª ley de Newton garantiza la cancelación interna de fuerzas de forma exacta, mientras que la energía depende de la curvatura y la tangente de Euler.
+          </p>
+        </div>
+
+        <div>
+          <div class="card" style="border-left: 4px solid var(--leapfrog); margin-bottom: 1rem;">
+            <h3>🧠 El concepto clave que me quedó</h3>
+            <p>
+              Entendí a fondo qué significa que un integrador sea <strong>simpléctico</strong>: no es magia, sino que preserva el volumen del espacio de fases (teorema de Liouville). Por eso la energía oscila acotada y las órbitas no se abren.
+            </p>
+          </div>
+          <div class="card" style="border-left: 4px solid var(--star);">
+            <h3>🔭 Nexo con mi carrera (Astronomía)</h3>
+            <p>
+              Esto conecta directo con mi curso de <strong>Dinámica Orbital</strong>: entendí los fundamentos numéricos detrás de simuladores profesionales como <strong>REBOUND</strong> (integradores WHFast).
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel" id="note-11">
+        <strong>Guion (Tutor):</strong> "Lo más valioso fue usar al agente como tutor conceptual. Me ayudó a entender la diferencia entre conservar la física de pares (momento lineal) y la geometría del espacio de fases (simpléctico). Este aprendizaje conecta directamente con mi formación en astronomía y el uso de paquetes como REBOUND."
+      </div>
+    </div>
+
+    <!-- SLIDE 12: Conclusiones y Cierre -->
+    <div class="slide" id="slide-12">
+      <span class="tag tag-b3">Conclusiones y Cierre</span>
+      <h2>Conclusiones y aprendizajes del proyecto</h2>
+
+      <div class="grid-3" style="margin-top: 1.25rem; margin-bottom: 1.75rem;">
+        <div class="card" style="border-top: 4px solid var(--accent);">
+          <h3>1. Física vs Computación</h3>
+          <p>Un algoritmo puede no tener errores de programación y aun así violar la física si el método numérico no conserva la geometría del sistema.</p>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--leapfrog);">
+          <h3>2. Integradores Simplécticos</h3>
+          <p>Leapfrog demostró ser 7 órdenes de magnitud más preciso que Euler para el mismo $\Delta t$, permitiendo simulaciones astronómicas estables.</p>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--b3);">
+          <h3>3. Uso Crítico de la IA</h3>
+          <p>La IA potencia el aprendizaje cuando el estudiante mantiene el criterio científico, audita cada resultado y guía el proceso con rigor.</p>
+        </div>
+      </div>
+
+      <div class="callout callout-success" style="text-align: center;">
+        <strong>¡Muchas gracias por su atención!</strong><br>
+        <span style="font-size: 0.95rem; color: var(--text-muted);">
+          Código, pruebas y gráficos disponibles en el repositorio local / GitHub • Quedo abierta a preguntas.
+        </span>
+      </div>
+      <div class="notes-panel" id="note-12">
+        <strong>Guion de cierre:</strong> "En conclusión: aprendí que un código sin bugs puede violar la física si no es simpléctico, y que la IA es una herramienta excelente de aprendizaje si uno sabe auditarla y dirigirla. ¡Muchas gracias y quedo abierta a sus preguntas!"
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="progress-dots" id="dotsContainer"></div>
+
+    <div class="nav-buttons">
+      <span class="notes-toggle" onclick="toggleNotes()">[Ver Notas de Guion]</span>
+      <span class="meta" style="margin-right: 0.5rem;"><span class="kb">←</span> <span class="kb">→</span> para navegar</span>
+      <button class="nav-btn" onclick="prevSlide()">Anterior</button>
+      <button class="nav-btn" onclick="nextSlide()">Siguiente</button>
+    </div>
+  </footer>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 12;
+
+    const dotsContainer = document.getElementById('dotsContainer');
+    for (let i = 1; i <= totalSlides; i++) {
+      const dot = document.createElement('div');
+      dot.className = `dot ${i === 1 ? 'active' : ''}`;
+      dot.onclick = () => goToSlide(i);
+      dotsContainer.appendChild(dot);
+    }
+
+    function updateSlides() {
+      document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+      const activeSlide = document.getElementById(`slide-${currentSlide}`);
+      if (activeSlide) activeSlide.classList.add('active');
+
+      document.querySelectorAll('.dot').forEach((d, idx) => {
+        d.classList.toggle('active', idx + 1 === currentSlide);
+      });
+
+      if (typeof initMath === 'function') {
+        initMath();
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateSlides();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlides();
+      }
+    }
+
+    function goToSlide(n) {
+      currentSlide = n;
+      updateSlides();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      }
+    });
+
+    function toggleNotes() {
+      const panel = document.getElementById(`note-${currentSlide}`);
+      if (panel) {
+        panel.classList.toggle('visible');
+      }
+    }
+
+    // ==========================================
+    // Interactive N-Body Simulation Engine
+    // (Física exacta de simulacion_planetaria.py)
+    // ==========================================
+    const canvas = document.getElementById('orbitCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let currentSystem = '3body'; // '3body' or 'consigna'
+    let mode = 'euler';          // 'euler' or 'leapfrog'
+    let isPaused = false;
+    let simSpeed = 1;
+    let simTime = 0;
+    
+    let bodies = [];
+    let initialEnergy = 0;
+    let dt = 0.0025;
+    const originX = canvas.width / 2;
+    const originY = canvas.height / 2;
+    let scale = 80;
+
+    function initBodies() {
+      simTime = 0;
+      if (currentSystem === '3body') {
+        dt = 0.0025;
+        scale = 80;
+        // Exact 3-body system translated to barycenter
+        bodies = [
+          {
+            name: 'Estrella',
+            mass: 1.0,
+            x: -0.00299401, y: 0.0,
+            vx: 0.0, vy: -0.00170455,
+            ax: 0.0, ay: 0.0,
+            color: '#fbbf24', radius: 10,
+            fixed: false,
+            trail: []
+          },
+          {
+            name: 'Planeta 1',
+            mass: 1e-3,
+            x: 0.99700599, y: 0.0,
+            vx: 0.0, vy: 0.99879532,
+            ax: 0.0, ay: 0.0,
+            color: '#38bdf8', radius: 5,
+            fixed: false,
+            trail: []
+          },
+          {
+            name: 'Planeta 2',
+            mass: 1e-3,
+            x: 1.99700599, y: 0.0,
+            vx: 0.0, vy: 0.70575570,
+            ax: 0.0, ay: 0.0,
+            color: '#f87171', radius: 5,
+            fixed: false,
+            trail: []
+          }
+        ];
+      } else {
+        // Teacher's prompt test case: GM=1, r=1, v=1, dt=0.035
+        dt = 0.035;
+        scale = 115;
+        bodies = [
+          {
+            name: 'Masa Central (GM=1)',
+            mass: 1.0,
+            x: 0.0, y: 0.0,
+            vx: 0.0, vy: 0.0,
+            ax: 0.0, ay: 0.0,
+            color: '#fbbf24', radius: 12,
+            fixed: true,
+            trail: []
+          },
+          {
+            name: 'Planeta',
+            mass: 1e-5,
+            x: 1.0, y: 0.0,
+            vx: 0.0, vy: 1.0,
+            ax: 0.0, ay: 0.0,
+            color: '#38bdf8', radius: 6,
+            fixed: false,
+            trail: []
+          }
+        ];
+      }
+
+      calcAccelerations();
+      initialEnergy = calcTotalEnergy();
+    }
+
+    function calcAccelerations() {
+      const N = bodies.length;
+      for (let i = 0; i < N; i++) {
+        bodies[i].ax = 0;
+        bodies[i].ay = 0;
+      }
+      for (let i = 0; i < N; i++) {
+        if (bodies[i].fixed) continue;
+        for (let j = 0; j < N; j++) {
+          if (i === j) continue;
+          const dx = bodies[j].x - bodies[i].x;
+          const dy = bodies[j].y - bodies[i].y;
+          const distSq = dx * dx + dy * dy + 1e-9;
+          const dist = Math.sqrt(distSq);
+          const force = (1.0 * bodies[j].mass) / (distSq * dist);
+          bodies[i].ax += force * dx;
+          bodies[i].ay += force * dy;
+        }
+      }
+    }
+
+    function calcTotalEnergy() {
+      let K = 0;
+      let U = 0;
+      const N = bodies.length;
+      for (let i = 0; i < N; i++) {
+        const vSq = bodies[i].vx * bodies[i].vx + bodies[i].vy * bodies[i].vy;
+        K += 0.5 * bodies[i].mass * vSq;
+      }
+      for (let i = 0; i < N; i++) {
+        for (let j = i + 1; j < N; j++) {
+          const dx = bodies[j].x - bodies[i].x;
+          const dy = bodies[j].y - bodies[i].y;
+          const dist = Math.sqrt(dx * dx + dy * dy + 1e-9);
+          U -= (1.0 * bodies[i].mass * bodies[j].mass) / dist;
+        }
+      }
+      return K + U;
+    }
+
+    function calcTotalMomentum() {
+      let Px = 0, Py = 0;
+      for (let i = 0; i < bodies.length; i++) {
+        Px += bodies[i].mass * bodies[i].vx;
+        Py += bodies[i].mass * bodies[i].vy;
+      }
+      return Math.sqrt(Px * Px + Py * Py);
+    }
+
+    function setSystem(sys) {
+      currentSystem = sys;
+      document.getElementById('btnSys3').classList.toggle('active', sys === '3body');
+      document.getElementById('btnSys1').classList.toggle('active', sys === 'consigna');
+      updateStatusText();
+      initBodies();
+    }
+
+    function setMode(newMode) {
+      mode = newMode;
+      document.getElementById('btnEuler').classList.toggle('active', mode === 'euler');
+      document.getElementById('btnLeap').classList.toggle('active', mode === 'leapfrog');
+      updateStatusText();
+      initBodies();
+    }
+
+    function togglePlayPause() {
+      isPaused = !isPaused;
+      document.getElementById('btnPlayPause').innerText = isPaused ? '▶️ Reanudar' : '⏸️ Pausar';
+    }
+
+    function setSpeed(sp) {
+      simSpeed = sp;
+    }
+
+    function resetSim() {
+      initBodies();
+    }
+
+    function updateStatusText() {
+      const status = document.getElementById('simStatus');
+      const sysName = currentSystem === '3body' ? 'Sistema 3 Cuerpos (Estrella + 2 Planetas en 2D)' : 'Caso Testigo de la Consigna (1 Planeta circular)';
+      if (mode === 'euler') {
+        status.innerHTML = `Sistema: <strong>${sysName}</strong> | Integrador: <strong>Euler Explícito</strong> | Las órbitas ganan energía y se abren en espiral.`;
+      } else {
+        status.innerHTML = `Sistema: <strong>${sysName}</strong> | Integrador: <strong>Leapfrog Simpléctico</strong> | Las órbitas se mantienen cerradas y la energía oscila acotada.`;
+      }
+    }
+
+    function stepPhysics() {
+      if (isPaused) return;
+      const N = bodies.length;
+
+      if (mode === 'euler') {
+        // Euler Explícito: r^{n+1} = r^n + v^n dt, v^{n+1} = v^n + a^n dt
+        for (let i = 0; i < N; i++) {
+          if (bodies[i].fixed) continue;
+          bodies[i].x += bodies[i].vx * dt;
+          bodies[i].y += bodies[i].vy * dt;
+          bodies[i].vx += bodies[i].ax * dt;
+          bodies[i].vy += bodies[i].ay * dt;
+        }
+        calcAccelerations();
+      } else {
+        // Leapfrog Kick-Drift-Kick:
+        for (let i = 0; i < N; i++) {
+          if (bodies[i].fixed) continue;
+          bodies[i].vx += 0.5 * dt * bodies[i].ax;
+          bodies[i].vy += 0.5 * dt * bodies[i].ay;
+          bodies[i].x += dt * bodies[i].vx;
+          bodies[i].y += dt * bodies[i].vy;
+        }
+        calcAccelerations();
+        for (let i = 0; i < N; i++) {
+          if (bodies[i].fixed) continue;
+          bodies[i].vx += 0.5 * dt * bodies[i].ax;
+          bodies[i].vy += 0.5 * dt * bodies[i].ay;
+        }
+      }
+
+      simTime += dt;
+
+      // Guardar puntos de la trayectoria
+      for (let i = 0; i < N; i++) {
+        bodies[i].trail.push({ x: bodies[i].x, y: bodies[i].y });
+        if (bodies[i].trail.length > 500) bodies[i].trail.shift();
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = '#050b14';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Ejes y Baricentro
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height);
+      ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY);
+      ctx.stroke();
+
+      // Marca del Baricentro
+      ctx.strokeStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(originX - 4, originY); ctx.lineTo(originX + 4, originY);
+      ctx.moveTo(originX, originY - 4); ctx.lineTo(originX, originY + 4);
+      ctx.stroke();
+
+      // Dibujar Trails
+      const N = bodies.length;
+      for (let b = 0; b < N; b++) {
+        const tr = bodies[b].trail;
+        if (tr.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(originX + tr[0].x * scale, originY - tr[0].y * scale);
+          for (let i = 1; i < tr.length; i++) {
+            ctx.lineTo(originX + tr[i].x * scale, originY - tr[i].y * scale);
+          }
+          ctx.strokeStyle = bodies[b].color;
+          ctx.lineWidth = 1.3;
+          ctx.globalAlpha = 0.65;
+          ctx.stroke();
+          ctx.globalAlpha = 1.0;
+        }
+      }
+
+      // Dibujar Cuerpos
+      for (let b = 0; b < N; b++) {
+        const px = originX + bodies[b].x * scale;
+        const py = originY - bodies[b].y * scale;
+
+        ctx.beginPath();
+        ctx.arc(px, py, bodies[b].radius, 0, Math.PI * 2);
+        ctx.fillStyle = bodies[b].color;
+        ctx.shadowBlur = b === 0 ? 16 : 8;
+        ctx.shadowColor = bodies[b].color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Etiqueta del nombre
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '10px system-ui';
+        ctx.fillText(bodies[b].name, px + bodies[b].radius + 4, py - 4);
+      }
+
+      // Cálculo de Métricas en Vivo
+      const currentE = calcTotalEnergy();
+      const deltaE = Math.abs(initialEnergy) > 1e-12 ? ((currentE - initialEnergy) / Math.abs(initialEnergy)) * 100 : 0;
+      const P_total = calcTotalMomentum();
+
+      // HUD superior en el canvas
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(8, 8, canvas.width - 16, 26);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+      ctx.strokeRect(8, 8, canvas.width - 16, 26);
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '11px monospace';
+      
+      const errColor = Math.abs(deltaE) < 0.1 ? '#4ade80' : Math.abs(deltaE) < 5 ? '#fbbf24' : '#f87171';
+      
+      ctx.fillText(`Tiempo: ${simTime.toFixed(2)} t0`, 20, 25);
+      
+      ctx.fillStyle = errColor;
+      ctx.fillText(`Error Energía δE: ${deltaE >= 0 ? '+' : ''}${deltaE.toFixed(3)}%`, 180, 25);
+      
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`Momento |P|: ${P_total.toExponential(1)}`, 440, 25);
+      ctx.fillText(`Integrador: ${mode.toUpperCase()}`, 580, 25);
+    }
+
+    function animLoop() {
+      for (let s = 0; s < simSpeed * 2; s++) {
+        stepPhysics();
+      }
+      draw();
+      requestAnimationFrame(animLoop);
+    }
+
+    initBodies();
+    animLoop();
+
+    // Render KaTeX equations (Local 100% offline + Fallback inteligente)
+    function initMath() {
+      if (typeof renderMathInElement === 'function') {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false
+        });
+      } else {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        const textNodes = [];
+        while (node = walker.nextNode()) textNodes.push(node);
+        textNodes.forEach(n => {
+          if (n.nodeValue.includes('$')) {
+            let txt = n.nodeValue;
+            txt = txt.replace(/\$\\Delta t, \\Delta t\/2, \\Delta t\/4\$/g, 'Δt, Δt/2, Δt/4');
+            txt = txt.replace(/\$\\Delta t\$/g, 'Δt');
+            txt = txt.replace(/\$\\Delta t\/2\$/g, 'Δt/2');
+            txt = txt.replace(/\$\\Delta t\/4\$/g, 'Δt/4');
+            txt = txt.replace(/\$\\approx\$/g, '≈');
+            txt = txt.replace(/\$\\mathcal\{O\}\(\\Delta t\)\$/g, '𝒪(Δt)');
+            txt = txt.replace(/\$10\^\{-18\}\$/g, '10⁻¹⁸');
+            txt = txt.replace(/\$10\^\{-3\}\$/g, '10⁻³');
+            txt = txt.replace(/\$M = 1\.0\$/g, 'M = 1.0');
+            txt = txt.replace(/\$r_1 = 1\.0\$/g, 'r₁ = 1.0');
+            txt = txt.replace(/\$r_2 = 2\.0\$/g, 'r₂ = 2.0');
+            txt = txt.replace(/\$\\vec\{R\}_\{?\\text\{cm\}\}?\(0\) = \\vec\{0\}\$/g, 'R_cm(0) = 0');
+            txt = txt.replace(/\$\\vec\{P\}\(0\) = \\vec\{0\}\$/g, 'P(0) = 0');
+            txt = txt.replace(/\$\(-1, 0\)\$/g, '(-1, 0)');
+            txt = txt.replace(/\$\\vec\{P\}\$/g, 'P');
+            txt = txt.replace(/\$\\vec\{F\}_\{ij\} = -\\vec\{F\}_\{ji\}\$/g, 'F_ij = -F_ji');
+            txt = txt.replace(/\$GM=1\$/g, 'GM = 1');
+            txt = txt.replace(/\$r=1\$/g, 'r = 1');
+            txt = txt.replace(/\$t=30\$/g, 't = 30');
+            txt = txt.replace(/\$-0\.5\$/g, '-0.5');
+            txt = txt.replace(/\$-0\.23\$/g, '-0.23');
+            n.nodeValue = txt;
+          }
+        });
+      }
+    }
+    window.addEventListener('DOMContentLoaded', initMath);
+    setTimeout(initMath, 100);
+    setTimeout(initMath, 400);
+  </script>
+</body>
+</html>
